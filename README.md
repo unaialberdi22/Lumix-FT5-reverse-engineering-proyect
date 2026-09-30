@@ -50,7 +50,7 @@ update files alone.
 | 1 | Container / module table / CRC32 / digest rule | done |
 | 2 | Identify cipher and key source | open, no positive result |
 | 3 | Determine whether the package is signed (and how) | open |
-| 4 | Find a route to run own code (service mode, USB, hardware access) | open, ideas only |
+| 4 | Find a route to run own code (service mode, USB, hardware access: see "Hardware route") | open, ideas only |
 | 5 | Build and test a modified package | blocked by 2–4 |
 
 ### How the work is validated
@@ -304,6 +304,67 @@ The cipher therefore looks like a modern one keyed with a secret that is not in 
 * Hardware access (debug pads, NAND dump) on a spare unit, or a memory dump of the
   decrypted image while running. The known-plaintext vectors and the digest rule
   above provide a way to validate any key or decryption hypothesis.
+
+## Hardware route: opening the camera, extracting data and flashing (planned, untested)
+
+Software-only analysis of the update files has reached its limit: the payloads are
+encrypted with a key that is not in the package. The realistic way forward is
+hardware access on a **spare, sacrificial unit** that you own. None of the steps below
+has been done yet; this section is a plan, not a result.
+
+1. **Open the camera.** Disassembly follows the public service manual
+   (DSC1304010CE). The camera is rated IPX8, so after reassembly it will no longer be
+   guaranteed waterproof (Panasonic requires an air-leak test with special equipment).
+2. **Locate the memory and look for debug access.** The NAND (IC6005, 1 Gbit) holds the
+   firmware and the "EEPROM area"; the main SoC is IC6001 (package-on-package with
+   SDRAM). The service manual documents no debug port or test pads, so any UART/JTAG
+   access would have to be discovered by probing.
+3. **Read the NAND from your own unit.** Either in-circuit (with the SoC held in
+   reset, if that works) or chip-off with a NAND programmer. This gives the
+   firmware as it is really stored, including `boot`, the loader and any
+   per-device data.
+4. **Recover the key or the decrypted image.** Options: find the key material in the
+   NAND dump or in the boot path; or dump RAM while the camera is running and the
+   image is already decrypted. Any candidate is checked with the known-plaintext
+   vectors and the digest rule above.
+5. **Flash back.** Write modified or restored content to the NAND with the programmer
+   (or through the camera's own update path if a signature-compatible package can ever
+   be built). Always keep a complete, verified dump of the original NAND first.
+
+Precautions:
+
+* Work on a spare unit. Expect to destroy at least one camera.
+* Make the full NAND backup before touching anything and store it privately.
+* The NAND contains **your camera's serial number and factory calibration**, and
+  possibly Wi-Fi/user settings. Never publish dumps; share only derived, non-identifying
+  findings (offsets, algorithm, key-derivation logic).
+* Flashing a wrong or unsigned image can brick the device. A programmer-based recovery
+  is only possible if the boot path can still be reached, so check the boot mechanism
+  before writing anything.
+
+## Legal and terms-of-use notes
+
+This is general information, **not legal advice**; the rules vary by country, and I am
+not a lawyer. If you plan to publish or distribute anything beyond what is in this repository, ask one.
+
+* **Warranty and terms:** opening the camera voids the warranty, and Panasonic's
+  firmware licence terms typically forbid reverse engineering and modification. Breaching
+  them is normally a contractual matter (you lose support/warranty), not a crime,
+  but it is a risk you accept.
+* **Copyright:** the firmware is Panasonic's. Do not publish firmware images, dumps,
+  decrypted modules or keys. This repository contains none. Publish only your own
+  code and descriptions.
+* **Interoperability / research:** in the EU (Software Directive 2009/24/EC), studying how
+  a program works and decompiling it for interoperability is allowed under limited
+  conditions. National laws (in Spain, the Ley de Propiedad Intelectual) and other
+  jurisdictions (e.g. DMCA §1201 in the US) treat the circumvention of technical
+  protection measures differently, sometimes with exceptions for research or
+  interoperability, sometimes without.
+* **Your own device:** examining a camera that you own, for study, is generally the
+  most defensible case. Distributing tools that bypass encryption/signatures, or
+  distributing modified firmware that contains Panasonic code, is the riskiest.
+* **Personal data:** dumps contain identifying data (serial number, settings). Treat
+  them as personal data and do not share them.
 
 ## License
 

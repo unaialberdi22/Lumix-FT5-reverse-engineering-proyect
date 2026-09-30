@@ -1,7 +1,7 @@
-# Panasonic Lumix "UPD" firmware packages – format notes (FT5 / TS5 / TZ40 / TZ41)
+# Panasonic Lumix "UPD" firmware packages – reverse engineering notes (FT5 / TS5 / TZ40 / TZ41)
 
-Notes and a small parser for the firmware update packages of the 2013 Panasonic
-compacts **DMC-FT5 / TS5** and **DMC-TZ40 / TZ41 (ZS30)**.
+Reverse-engineering notes and a small parser for the firmware update packages of the
+2013 Panasonic compacts **DMC-FT5 / TS5** and **DMC-TZ40 / TZ41 (ZS30)**.
 
 **Status: the container format is understood; the encryption is not broken.**
 Nothing here decrypts a module, and there is no way (yet) to build a package the
@@ -10,6 +10,98 @@ public update files alone, plus a few negative results that may save others time
 
 > No firmware images, camera dumps or keys are included in this repository.
 > Update files are copyrighted; get them from Panasonic or your own camera.
+
+## About this project
+
+### Goal
+
+The long-term goal is a **custom firmware / code-execution path** for these cameras,
+in the spirit of what CHDK did for Canon compacts: run your own code on the camera
+(extra features, scripting, better raw/video options, diagnostics) without
+replacing the stock firmware permanently.
+
+Panasonic does not document its firmware, does not publish tooling for it and
+ships every update as an opaque `.bin` package. Before any custom firmware is
+possible, four questions have to be answered, in this order:
+
+1. **What is the package format?** Answered, see "Package layout" below.
+2. **How are the modules protected?** Partly answered. Payloads are encrypted, and
+   the cipher, mode and key source are unknown (see "Encryption").
+3. **Does the camera verify a signature, or only a digest/CRC?** Unknown.
+   The 512-byte module heads and the 64-byte block at 0x220 might be signatures.
+4. **Is there a way in that does not need the firmware key?** Not investigated
+   yet (USB service protocol, service menu, hardware access).
+
+This repository documents steps 1–2 as far as they can be taken from the public
+update files alone.
+
+### What this repository is (and is not)
+
+* It **is** a documentation of the container format, a parser (`lumix_upd.py`) that
+  can inspect, compare and extract modules exactly as stored, and a record of
+  negative results so nobody repeats them.
+* It **is not** a firmware, a decryptor, a key dump or a flashing tool.
+  It cannot produce a package the camera would accept.
+
+### Roadmap
+
+| Stage | Description | State |
+|---|---|---|
+| 1 | Container / module table / CRC32 / digest rule | done |
+| 2 | Identify cipher and key source | open, no positive result |
+| 3 | Determine whether the package is signed (and how) | open |
+| 4 | Find a route to run own code (service mode, USB, hardware access) | open, ideas only |
+| 5 | Build and test a modified package | blocked by 2–4 |
+
+### How the work is validated
+
+Every hypothesis about decryption can be checked without any external reference:
+
+* the **known-plaintext vectors** (`eep_net_a/b` decrypt to all `0xFF`), and
+* the **digest rule** (`SHA-256(blank head || decrypted payload)` must equal the
+  digest in the module table).
+
+If you have a candidate key, algorithm or a memory dump, these two checks tell you
+quickly whether it is right.
+
+### How to contribute
+
+Useful contributions, roughly in order of value:
+
+* Test hypotheses on the vectors below and report the result, **including negative ones**.
+* Insight on the cipher/key derivation from other Panasonic / Venus Engine devices
+  (other Lumix models, camcorders, the "Venus Engine" SoC family).
+* Analysis of the two unexplained blocks (512-byte module heads, 64-byte block at 0x220).
+* Digest scope for `ninsho_fc1`, `ninsho_fc2`, `gps_assist`.
+* Hardware findings on a spare unit (debug pads, NAND dump, decrypted memory dump).
+
+Please do not upload firmware images, `F`/`U` service dumps or anything containing
+serial numbers, calibration data or personal settings.
+
+### Risks
+
+Flashing anything to a camera can permanently brick it, and opening it compromises
+its water-tightness (rated IPX8). Nothing here has been tested on modified
+packages. Do not flash old or modified images on a camera you cannot afford to lose.
+
+### Use of AI in this project
+
+This project has made **extensive use of AI**, specifically **Claude Sonnet 5.5**
+(Anthropic). The model was used for, among other things:
+
+* exploring the package structure and proposing field interpretations,
+* writing and refactoring the parser and the analysis scripts,
+* designing and running the cryptanalytic tests summarised below
+  (about 16 000 key/IV/mode combinations, keystream statistics),
+* drafting and restructuring this documentation.
+
+Because of this, treat the material with the usual caution towards AI-assisted work:
+
+* Statements marked **verified** (CRC32, digest rule for the listed modules) are
+  reproducible with the included script and the public update files.
+* Statements marked as *interpretation*, *hypothesis* or *speculation*
+  (build stamp, size-based mappings, "could be a signature") are exactly that.
+* Errors are possible. If you find one, please open an issue.
 
 ## Files analysed
 
